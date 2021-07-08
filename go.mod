@@ -10,5 +10,6 @@ require (
 	github.com/gorilla/websocket v1.4.2
 	github.com/onsi/ginkgo v1.15.2 // indirect
 	github.com/onsi/gomega v1.11.0 // indirect
+	go.uber.org/zap v1.15.0
 	kernel v0.0.0-00010101000000-000000000000
 )
