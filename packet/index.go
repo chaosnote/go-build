@@ -2,9 +2,10 @@ package packet
 
 import (
 	"fmt"
-	"kernel/conv"
 
 	"log"
+
+	"github.com/chaosnote/go-kernel/conv"
 )
 
 // 封包處理機制、會依專案有不同做法、思考後，還是另開共用區比較好

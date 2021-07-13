@@ -1,7 +1,7 @@
 package log
 
 import (
-	"kernel/helper"
+	"github.com/chaosnote/go-kernel/helper"
 
 	"go.uber.org/zap"
 )
