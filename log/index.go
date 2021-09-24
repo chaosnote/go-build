@@ -31,7 +31,14 @@ func Console(msg string, fields ...zap.Field) {
 File ...
 */
 func File(msg string, fields ...zap.Field) {
-	check()
-	logger.Console.Debug(msg, fields...)
+	Console(msg, fields...)
 	logger.File.Info(msg, fields...)
+}
+
+/*
+Fatal ...
+*/
+func Fatal(msg string, fields ...zap.Field) {
+	Console(msg, fields...)
+	logger.File.Fatal(msg, fields...)
 }

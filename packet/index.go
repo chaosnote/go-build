@@ -5,7 +5,7 @@ import (
 
 	"log"
 
-	"github.com/chaosnote/go-kernel/conv"
+	"github.com/shopspring/decimal"
 )
 
 // 封包處理機制、會依專案有不同做法、思考後，還是另開共用區比較好
@@ -38,7 +38,7 @@ type Packet struct {
 // func (v Packet) Action() string {
 // 	dist := ""
 // 	for _, b := range v[0:2] {
-// 		dist = dist + conv.Int64(b).ToString()
+// 		dist = dist + decimal.NewFromInt(int64(b)).String()
 // 	}
 // 	return dist
 // }
@@ -70,7 +70,8 @@ type Bytes []byte
 func (v Bytes) ToString() string {
 	d := ""
 	for _, b := range v {
-		d = d + conv.Int64(b).ToString()
+
+		d = d + decimal.NewFromInt(int64(b)).String()
 	}
 	return d
 }
