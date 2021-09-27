@@ -14,7 +14,7 @@ const (
 	mWriteWait      = 10 * time.Second     // (等待)寫入時間
 	mPongWait       = 60 * time.Second     // (等待)回應時間
 	mPingPeriod     = (mPongWait * 9) / 10 // 偵測時間
-	mMaxMessageSize = 1024
+	mMaxMessageSize = 1024                 // 訊息最大長度
 )
 
 /*
@@ -27,10 +27,18 @@ HandlerRead 處理串流讀取
 type HandlerRead func(string, []byte)
 
 /*
+HandlerClose 處理串流關閉
+
+	id string
+
+*/
+type HandlerClose func(string)
+
+/*
 HandlerError 處理串流錯誤
 
 	id string
-	err interface{} recover 的資訊無法定義
+	err interface{} 無法定義 recover 資訊
 
 */
 type HandlerError func(string, interface{})
@@ -45,6 +53,7 @@ type param struct {
 	mConn  *websocket.Conn
 	mSend  chan []byte
 	mRead  HandlerRead
+	mClose HandlerClose
 	mError HandlerError
 }
 
@@ -60,14 +69,37 @@ func (p *param) Error(e interface{}) {
 	}
 }
 
+func (p *param) Close() {
+	if p.mClose != nil {
+		p.mClose(p.mID)
+	}
+}
+
+func (p *param) Destory() {
+	p.mRead = nil
+	p.mError = nil
+	p.mClose = nil
+
+	p.mConn = nil
+
+	close(p.mSend)
+}
+
 //-----------------------------------------------[private]
 
 func r(p param) {
 
 	defer func() {
+
 		if e := recover(); e != nil {
 			p.Error(e)
 		}
+
+		p.mConn.Close()
+		p.Close()
+
+		destory(p.mID)
+
 	}()
 
 	p.mConn.SetReadLimit(mMaxMessageSize)
@@ -80,10 +112,8 @@ func r(p param) {
 
 		if e != nil {
 
-			if websocket.IsUnexpectedCloseError(e, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+			if websocket.IsUnexpectedCloseError(e, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) { // 非預期連線錯誤
 				p.Error(e)
-			} else {
-				p.Error(nil)
 			}
 
 			return
@@ -96,15 +126,17 @@ func r(p param) {
 }
 
 func w(p param, msgType int) {
+
 	t := time.NewTicker(mPingPeriod)
 
 	defer func() {
 
-		t.Stop()
-
 		if e := recover(); e != nil {
 			p.Error(e) // 由委派層決定流程
 		}
+
+		t.Stop()
+		p.mConn.Close()
 
 	}()
 
@@ -116,30 +148,23 @@ func w(p param, msgType int) {
 			p.mConn.SetWriteDeadline(time.Now().Add(mWriteWait))
 			if !ok {
 				p.mConn.WriteMessage(websocket.CloseMessage, []byte{})
-				p.Error(nil)
 				return
 			}
 
 			writer, e := p.mConn.NextWriter(msgType)
 			if e != nil {
-				p.Error(e)
 				return
 			}
 
 			writer.Write(b)
 			if e := writer.Close(); e != nil {
-				p.Error(e)
 				return
 			}
 
 		case <-t.C:
 			p.mConn.SetWriteDeadline(time.Now().Add(mWriteWait))
 
-			if e := p.mConn.WriteMessage(websocket.PingMessage, nil); e != nil { // 心跳封包錯誤
-				// (需留意)連線並非即時關閉
-				// msg, _ := url.QueryUnescape()
-				// "write tcp 127.0.0.1:10001->127.0.0.1:30061: use of closed network connection"
-				p.Error(nil)
+			if e := p.mConn.WriteMessage(websocket.PingMessage, nil); e != nil { // (已知)心跳封包錯誤、不在處理
 				return
 			}
 
@@ -165,24 +190,18 @@ func Send(id string, msg []byte) {
 }
 
 /*
-Destory
-摧毀指定(連線)
+destory
+摧毀已註冊連線
 
 	id
 		外部指定
 
 */
-func Destory(id string) {
+func destory(id string) {
 	mu.Lock()
 
 	if p, ok := pool[id]; ok {
-		p.mRead = nil
-		p.mError = nil
-
-		close(p.mSend)
-
-		p.mConn.Close() // 放置於 close 後，因為順序為關閉讀後，才觸發寫入 close message
-
+		p.Destory()
 		delete(pool, id)
 	}
 
@@ -205,16 +224,19 @@ func AddObserver(
 	msgType int,
 	conn *websocket.Conn,
 	read HandlerRead,
+	close HandlerClose,
 	err HandlerError,
 ) {
 	c := param{
 		mID:    id,
 		mConn:  conn,
 		mRead:  read,
+		mClose: close,
 		mError: err,
 		mSend:  make(chan []byte),
 	}
 
+	// 註冊連線
 	mu.Lock()
 	pool[id] = c
 	mu.Unlock()
