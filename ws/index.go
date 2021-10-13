@@ -27,7 +27,8 @@ HandlerRead 處理串流讀取
 type HandlerRead func(string, []byte)
 
 /*
-HandlerClose 處理串流關閉
+HandlerClose
+處理串流關閉，如果使用 Group ，則需呼叫 Group.Remove(id)
 
 	id string
 
@@ -46,9 +47,9 @@ type HandlerError func(string, interface{})
 //----------------------------------------------------------------------------------------------
 
 /*
-param ...
+Param ...
 */
-type param struct {
+type Param struct {
 	mID    string // or uid
 	mConn  *websocket.Conn
 	mSend  chan []byte
@@ -57,25 +58,25 @@ type param struct {
 	mError HandlerError
 }
 
-func (p *param) Read(msg []byte) {
+func (p *Param) Read(msg []byte) {
 	if p.mRead != nil {
 		p.mRead(p.mID, msg)
 	}
 }
 
-func (p *param) Error(e interface{}) {
+func (p *Param) Error(e interface{}) {
 	if p.mError != nil {
 		p.mError(p.mID, e)
 	}
 }
 
-func (p *param) Close() {
+func (p *Param) Close() {
 	if p.mClose != nil {
 		p.mClose(p.mID)
 	}
 }
 
-func (p *param) Destory() {
+func (p *Param) Destory() {
 	p.mRead = nil
 	p.mError = nil
 	p.mClose = nil
@@ -87,7 +88,7 @@ func (p *param) Destory() {
 
 //-----------------------------------------------[private]
 
-func r(p param) {
+func r(p Param) {
 
 	defer func() {
 
@@ -97,8 +98,6 @@ func r(p param) {
 
 		p.mConn.Close()
 		p.Close()
-
-		destory(p.mID)
 
 	}()
 
@@ -125,7 +124,7 @@ func r(p param) {
 
 }
 
-func w(p param, msgType int) {
+func w(p Param, msgType int) {
 
 	t := time.NewTicker(mPingPeriod)
 
@@ -176,42 +175,47 @@ func w(p param, msgType int) {
 
 //----------------------------------------------------------------------------------------------
 
-var mu sync.Mutex
-var pool = map[string]param{}
+type Group struct {
+	mMu   sync.Mutex
+	mPool map[string]Param
+}
 
-func Send(id string, msg []byte) {
-	mu.Lock()
-	if p, ok := pool[id]; ok {
+/*
+Broadcast
+擴播
+
+	msg []byte
+*/
+func (v *Group) Broadcast(msg []byte) {
+	v.mMu.Lock()
+	defer v.mMu.Unlock()
+
+	for _, conn := range v.mPool {
+		conn.mSend <- msg
+	}
+}
+
+/*
+Send
+指定傳送
+
+	id string
+	msg []byte
+
+*/
+func (v *Group) Send(id string, msg []byte) {
+	v.mMu.Lock()
+	defer v.mMu.Unlock()
+
+	if p, ok := v.mPool[id]; ok {
 		p.mSend <- msg
 	} else {
 		log.Println("socket lost id >>", id)
 	}
-	mu.Unlock()
 }
 
 /*
-destory
-摧毀已註冊連線
-
-	id
-		外部指定
-
-*/
-func destory(id string) {
-	mu.Lock()
-
-	if p, ok := pool[id]; ok {
-		p.Destory()
-		delete(pool, id)
-	}
-
-	mu.Unlock()
-}
-
-//----------------------------------------------------------------------------------------------[build client]
-
-/*
-AddObserver
+Add
 串流處理行為( 改由外部設置 )
 	委派
 		讀
@@ -219,7 +223,7 @@ AddObserver
 	併發
 		寫
 */
-func AddObserver(
+func (v *Group) Add(
 	id string,
 	msgType int,
 	conn *websocket.Conn,
@@ -227,7 +231,7 @@ func AddObserver(
 	close HandlerClose,
 	err HandlerError,
 ) {
-	c := param{
+	c := Param{
 		mID:    id,
 		mConn:  conn,
 		mRead:  read,
@@ -236,11 +240,36 @@ func AddObserver(
 		mSend:  make(chan []byte),
 	}
 
-	// 註冊連線
-	mu.Lock()
-	pool[id] = c
-	mu.Unlock()
+	v.mMu.Lock()
+	v.mPool[id] = c // 註冊連線
+	v.mMu.Unlock()
 
 	go r(c)
 	go w(c, msgType)
+}
+
+/*
+Remove
+(移除/摧毀)已註冊連線
+
+	id string
+		外部指定
+
+*/
+func (v *Group) Remove(id string) {
+	v.mMu.Lock()
+	defer v.mMu.Unlock()
+
+	if p, ok := v.mPool[id]; ok {
+		p.Destory()
+		delete(v.mPool, id)
+	}
+}
+
+//----------------------------------------------------------------------------------------------[build client]
+
+func New() *Group {
+	return &Group{
+		mPool: map[string]Param{},
+	}
 }
