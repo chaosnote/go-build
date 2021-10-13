@@ -1,7 +1,10 @@
-## 物件類
+# Build
+
+## Update
+    go get github.com/chaosnote/go-build@latest
 
 ## 相依性
-1. https://github.com/chaosnote/go-kernel
+    https://github.com/chaosnote/go-kernel
 
 ## 思考
-build -> xxx
+    build -> xxx
