@@ -9,23 +9,29 @@ mysql 通用服務項目
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql" // mysql-driver
 )
 
-// IConfig ...
-type IConfig interface {
-	Host() string
-	Schema() string
-	Account() string
-	Password() string
-	Name() string
+func UnmarshalConfig(data []byte) (Config, error) {
+	var r Config
+	err := json.Unmarshal(data, &r)
+	return r, err
+}
+
+type Config struct {
+	Host     string `json:"host"`
+	Schema   string `json:"schema"`
+	Account  string `json:"account"`
+	Password string `json:"password"`
+	Name     string `json:"name"`
 }
 
 // New ...
-func New(c IConfig) *sql.DB {
+func New(c Config) *sql.DB {
 	// key word : mysql current connection info
 	// sample 1. 當前連線資訊
 	// mysql -u root -p
@@ -40,9 +46,9 @@ func New(c IConfig) *sql.DB {
 	// 比較完整(中文)
 	// @see https://chromium.googlesource.com/external/github.com/go-sql-driver/mysql/+/a48f79b55b5a2107793c84c3bbd445138dc7f0d5/README.md#examples
 	// 設置規則
-	p := fmt.Sprintf("%s:%s@%s/%s", c.Account(), c.Password(), c.Host(), c.Name()) // 對應 sql 連線格式
+	p := fmt.Sprintf("%s:%s@%s/%s", c.Account, c.Password, c.Host, c.Name) // 對應 sql 連線格式
 
-	db, e := sql.Open(c.Schema(), p)
+	db, e := sql.Open(c.Schema, p)
 	//@see https://github.com/go-sql-driver/mysql#usage
 	db.SetConnMaxLifetime(time.Minute * 1)
 	db.SetMaxOpenConns(100)
