@@ -18,65 +18,65 @@ const (
 )
 
 /*
-HandlerRead 處理串流讀取
+OnRead 處理串流讀取
 
 	id string
 	content []byte
 
 */
-type HandlerRead func(string, []byte)
+type OnRead func(string, []byte)
 
 /*
-HandlerClose
+OnClose
 處理串流關閉，如果使用 Group ，則需呼叫 Group.Remove(id)
 
 	id string
 
 */
-type HandlerClose func(string)
+type OnClose func(string)
 
 /*
-HandlerError 處理串流錯誤
+OnError 處理串流錯誤
 
 	id string
 	err interface{} 無法定義 recover 資訊
 
 */
-type HandlerError func(string, interface{})
+type OnError func(string, interface{})
 
 //----------------------------------------------------------------------------------------------
 
 /*
-Param ...
+param ...
 */
-type Param struct {
+type param struct {
 	mID    string // or uid
 	mConn  *websocket.Conn
 	mSend  chan []byte
-	mRead  HandlerRead
-	mClose HandlerClose
-	mError HandlerError
+	mRead  OnRead
+	mClose OnClose
+	mError OnError
 }
 
-func (p *Param) Read(msg []byte) {
+func (p *param) Read(msg []byte) {
 	if p.mRead != nil {
 		p.mRead(p.mID, msg)
 	}
 }
 
-func (p *Param) Error(e interface{}) {
+func (p *param) Error(e interface{}) {
 	if p.mError != nil {
 		p.mError(p.mID, e)
 	}
 }
 
-func (p *Param) Close() {
+func (p *param) Close() {
 	if p.mClose != nil {
 		p.mClose(p.mID)
 	}
 }
 
-func (p *Param) Destory() {
+func (p *param) Destory() {
 	p.mRead = nil
 	p.mError = nil
 	p.mClose = nil
@@ -88,7 +88,7 @@ func (p *Param) Destory() {
 
 //-----------------------------------------------[private]
 
-func r(p Param) {
+func r(p param) {
 
 	defer func() {
 
@@ -124,7 +124,7 @@ func r(p Param) {
 
 }
 
-func w(p Param, msgType int) {
+func w(p param, msgType int) {
 
 	t := time.NewTicker(mPingPeriod)
 
@@ -177,7 +177,7 @@ func w(p Param, msgType int) {
 
 type Group struct {
 	mMu   sync.Mutex
-	mPool map[string]Param
+	mPool map[string]param
 }
 
 /*
@@ -227,11 +227,11 @@ func (v *Group) Add(
 	id string,
 	msgType int,
 	conn *websocket.Conn,
-	read HandlerRead,
-	close HandlerClose,
-	err HandlerError,
+	read OnRead,
+	close OnClose,
+	err OnError,
 ) {
-	c := Param{
+	c := param{
 		mID:    id,
 		mConn:  conn,
 		mRead:  read,
@@ -270,6 +270,6 @@ func (v *Group) Remove(id string) {
 
 func New() *Group {
 	return &Group{
-		mPool: map[string]Param{},
+		mPool: map[string]param{},
 	}
 }
