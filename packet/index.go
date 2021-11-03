@@ -4,8 +4,6 @@ import (
 	"fmt"
 
 	"log"
-
-	"github.com/shopspring/decimal"
 )
 
 /*
@@ -51,14 +49,22 @@ type Bytes []byte
 
 /*
 ToString
+另一種做法，將 byte 轉為 int
+*/
+// func (v Bytes) ToString() string {
+// 	d := ""
+// 	for _, b := range v {
+
+// 		d = d + decimal.NewFromInt(int64(b)).String()
+// 	}
+// 	return d
+// }
+
+/*
+ToString
 */
 func (v Bytes) ToString() string {
-	d := ""
-	for _, b := range v {
-
-		d = d + decimal.NewFromInt(int64(b)).String()
-	}
-	return d
+	return string(v)
 }
 
 /*
