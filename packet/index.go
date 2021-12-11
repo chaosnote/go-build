@@ -25,19 +25,8 @@ const (
 Packet
 */
 type Packet struct {
-	Key     Bytes
+	Action  Bytes
 	Content []byte
-}
-
-//-------------------------------------------------------------------------------------------------[Response]
-
-/*
-Response
-*/
-type Response struct {
-	Status  int64  // 狀態 {0:失敗,1:成功}
-	Message []byte // 失敗時回傳錯誤訊息或是代碼
-	Content []byte // 例: event + grpc
 }
 
 //-------------------------------------------------------------------------------------------------[Bytes]
@@ -76,17 +65,17 @@ func (v Bytes) ToByte() []byte {
 
 /*
 Write
-key + content
+action + content
 
-	key Bytes 例: uid
+	action Bytes 例: uid
 	content []byte
 
 	return []byte
 */
-func Write(key Bytes, content []byte) []byte {
+func Write(action Bytes, content []byte) []byte {
 	b := []byte{}
-	b = append(b, byte(len(key))) // 記錄 identify 值長度
-	b = append(b, key...)
+	b = append(b, byte(len(action))) // 記錄 identify 值長度
+	b = append(b, action...)
 
 	if content != nil {
 		b = append(b, content...)
@@ -113,7 +102,7 @@ func Read(p []byte) Packet {
 	e := s + int(p[0]) // Key 長度( 0-255 )
 
 	return Packet{
-		Key:     Bytes(p[1:e]),
+		Action:  Bytes(p[1:e]),
 		Content: p[e:],
 	}
 }

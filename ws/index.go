@@ -5,10 +5,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/chaosnote/go-build/packet"
-	"github.com/chaosnote/go-kernel/evt"
+	"github.com/chaosnote/go-kernel/net/conn"
+
 	"github.com/gorilla/websocket"
-	"go.uber.org/zap"
 )
 
 // 設定(常數)
@@ -29,26 +28,66 @@ const (
 //----------------------------------------------------------------------------------------------
 
 /*
-Param ...
+Handler (讀取/錯誤)處理
+*/
+type Handler interface {
+	Read(string, []byte)
+	Close(string)
+	Error(string, interface{})
+}
+
+/*
+Param 參數記錄
 */
 type Param struct {
 	ID          string // or uid
-	Conn        *websocket.Conn
+	WS          conn.WebSocket
 	MessageType int
-	Event       evt.IEvent
-	Send        chan []byte
 }
 
-func (p *Param) Destory() {
-	p.Conn = nil
-	close(p.Send)
+//----------------------------------------------------------------------------------------------
+
+/*
+Transfer
+
+	例 :
+	var _transfer = ws.Transfer{
+		Param: ws.Param{
+			ID:          id,
+			WS:          conn.WebSocket(uri),
+			MessageType: websocket.BinaryMessage,
+		},
+		Send:    make(chan []byte),
+		Handler: subscribe{},
+	}
+*/
+type Transfer struct {
+	Param
+	Handler
+
+	Conn *websocket.Conn
+
+	Send chan []byte
+}
+
+func (v *Transfer) Dial() error {
+	var e error
+	v.Conn, e = v.Param.WS.Dial()
+	if e != nil {
+		return e
+	}
+	return nil
+}
+
+func (v *Transfer) Destory() {
+	v.Handler = nil
 }
 
 //----------------------------------------------------------------------------------------------
 
 type Group struct {
 	mMu   sync.Mutex
-	mPool map[string]Param
+	mPool map[string]*Transfer
 }
 
 /*
@@ -80,33 +119,37 @@ func (v *Group) Broadcast(msg []byte) {
 	v.mMu.Lock()
 	defer v.mMu.Unlock()
 
-	for _, conn := range v.mPool {
-		conn.Send <- msg
+	for _, c := range v.mPool {
+		c.Send <- msg
 	}
 }
 
 /*
 Add
-串流處理行為( 改由外部設置 )
-	委派
-		讀
-		錯誤
-	併發
-		寫
 */
-func (v *Group) Add(p Param) {
+func (v *Group) Add(c *Transfer) {
 	v.mMu.Lock()
 	defer v.mMu.Unlock()
 
-	v.mPool[p.ID] = p
+	v.mPool[c.ID] = c
+}
+
+/*
+Get
+*/
+func (v *Group) Get(id string) (*Transfer, bool) {
+	v.mMu.Lock()
+	defer v.mMu.Unlock()
+
+	_transfer, ok := v.mPool[id]
+	return _transfer, ok
 }
 
 /*
 Remove
-(移除/摧毀)已註冊連線
+(移除)已註冊連線 (正常狀態下關閉連線)
 
-	id string
-		外部指定
+	id string Param ID
 
 */
 func (v *Group) Remove(id string) {
@@ -119,64 +162,75 @@ func (v *Group) Remove(id string) {
 	}
 }
 
+/*
+Close
+(關閉)已註冊連線、非正常情形下、強迫踢線
+
+	id string Param ID
+
+*/
+func (v *Group) Close(id string) {
+	v.mMu.Lock()
+	defer v.mMu.Unlock()
+
+	if p, ok := v.mPool[id]; ok {
+		p.Conn.WriteControl(websocket.CloseMessage, []byte("bye"), time.Now().Add(mWriteWait))
+		p.Conn.Close()
+		p.Destory()
+	}
+}
+
+/*
+CloseAll
+*/
+func (v *Group) CloseAll() {
+	v.mMu.Lock()
+	defer v.mMu.Unlock()
+
+	for _, p := range v.mPool {
+		p.Conn.WriteControl(websocket.CloseMessage, []byte("bye"), time.Now().Add(mWriteWait))
+		p.Conn.Close()
+		p.Destory()
+	}
+}
+
 //----------------------------------------------------------------------------------------------
 
-func R(p Param) {
+func R(c Transfer) {
 
 	defer func() {
 
 		if e := recover(); e != nil {
-			if p.Event != nil {
 
-				p.Event.Dispatch(
-					ERROR,
-					packet.Write(
-						packet.Bytes([]byte(p.ID)),
-						[]byte(zap.Any("Read", e).String),
-					),
-				)
-
+			if c.Handler != nil {
+				c.Error(c.ID, e)
 			}
+
 		}
 
-		p.Conn.Close()
+		c.Conn.Close()
+		c.Send <- nil // close 後呼叫，可讓 W 那邊出現錯誤
 
-		if p.Event != nil {
-
-			p.Event.Dispatch(
-				CLOSE,
-				packet.Write(
-					packet.Bytes([]byte(p.ID)),
-					[]byte{},
-				),
-			)
-
+		if c.Handler != nil {
+			c.Close(c.ID)
 		}
 
 	}()
 
-	p.Conn.SetReadLimit(mMaxMessageSize)
-	p.Conn.SetReadDeadline(time.Now().Add(mPongWait))
-	p.Conn.SetPongHandler(func(string) error { p.Conn.SetReadDeadline(time.Now().Add(mPongWait)); return nil })
+	c.Conn.SetReadLimit(mMaxMessageSize)
+	c.Conn.SetReadDeadline(time.Now().Add(mPongWait))
+	c.Conn.SetPongHandler(func(string) error { c.Conn.SetReadDeadline(time.Now().Add(mPongWait)); return nil })
 
 	for {
 
-		_, msg, e := p.Conn.ReadMessage()
+		_, msg, e := c.Conn.ReadMessage()
 
 		if e != nil {
 
 			if websocket.IsUnexpectedCloseError(e, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) { // 非預期連線錯誤
 
-				if p.Event != nil {
-
-					p.Event.Dispatch(
-						ERROR,
-						packet.Write(
-							packet.Bytes([]byte(p.ID)),
-							[]byte(zap.Any("Read", e).String),
-						),
-					)
-
+				if c.Handler != nil {
+					c.Error(c.ID, e)
 				}
 
 			}
@@ -184,23 +238,15 @@ func R(p Param) {
 			return
 		}
 
-		if p.Event != nil {
-
-			p.Event.Dispatch(
-				READ,
-				packet.Write(
-					packet.Bytes([]byte(p.ID)),
-					msg,
-				),
-			)
-
+		if c.Handler != nil {
+			c.Read(c.ID, msg)
 		}
 
 	}
 
 }
 
-func W(p Param) {
+func W(c Transfer) {
 
 	t := time.NewTicker(mPingPeriod)
 
@@ -208,50 +254,40 @@ func W(p Param) {
 
 		if e := recover(); e != nil {
 
-			if p.Event != nil {
-
-				p.Event.Dispatch(
-					ERROR,
-					packet.Write(
-						packet.Bytes([]byte(p.ID)),
-						[]byte(zap.Any("Write", e).String),
-					),
-				)
-
+			if c.Handler != nil {
+				c.Error(c.ID, e)
 			}
-
 		}
 
 		t.Stop()
-		p.Conn.Close()
+		c.Conn.Close()
+
+		// close(c.Send) // 關閉狀態下、自動重連( panic: send on closed channel )，每次進入重建 ? 思考
 
 	}()
 
 	for {
 		select {
 
-		case b, ok := <-p.Send:
-
-			p.Conn.SetWriteDeadline(time.Now().Add(mWriteWait))
+		case b, ok := <-c.Send:
+			c.Conn.SetWriteDeadline(time.Now().Add(mWriteWait))
 			if !ok {
-				p.Conn.WriteMessage(websocket.CloseMessage, []byte{})
+				c.Conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
-
-			writer, e := p.Conn.NextWriter(p.MessageType)
+			writer, e := c.Conn.NextWriter(c.MessageType)
 			if e != nil {
 				return
 			}
-
 			writer.Write(b)
 			if e := writer.Close(); e != nil {
 				return
 			}
-
 		case <-t.C:
-			p.Conn.SetWriteDeadline(time.Now().Add(mWriteWait))
 
-			if e := p.Conn.WriteMessage(websocket.PingMessage, nil); e != nil { // (已知)心跳封包錯誤、不在處理
+			c.Conn.SetWriteDeadline(time.Now().Add(mWriteWait))
+
+			if e := c.Conn.WriteMessage(websocket.PingMessage, nil); e != nil { // (已知)心跳封包錯誤、不在處理
 				return
 			}
 
@@ -265,6 +301,6 @@ func W(p Param) {
 
 func New() *Group {
 	return &Group{
-		mPool: map[string]Param{},
+		mPool: map[string]*Transfer{},
 	}
 }

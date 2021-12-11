@@ -1,16 +1,12 @@
 package redis
 
 import (
-	"encoding/json"
-
 	"github.com/go-redis/redis"
 )
 
-func UnmarshalConfig(data []byte) (Config, error) {
-	var r Config
-	err := json.Unmarshal(data, &r)
-	return r, err
-}
+var Method *redis.Client
+
+//-------------------------------------------------------------------------------------------------
 
 type Config struct {
 	Addr     string `json:"addr"`
@@ -33,26 +29,26 @@ func Empty(e error) bool {
 }
 
 // New ...
-func New(c Config) *redis.Client {
-	r := redis.NewClient(&redis.Options{
+func Build(c Config) {
+
+	Method = redis.NewClient(&redis.Options{
 		Addr:     c.Addr,
 		Password: c.Password, // no password
 		DB:       int(c.DB),  // use default DB
 	})
 
-	e := r.Ping().Err()
+	e := Method.Ping().Err()
 	if e != nil {
 		panic(e.Error())
 	}
 
 	if false {
 
-		e = r.FlushAll().Err()
+		e = Method.FlushAll().Err()
 		if e != nil {
 			panic(e.Error())
 		}
 
 	}
 
-	return r
 }
