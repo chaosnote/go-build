@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"log"
+
+	"github.com/shopspring/decimal"
 )
 
 /*
@@ -29,39 +31,26 @@ type Packet struct {
 	Content []byte
 }
 
+//-------------------------------------------------------------------------------------------------
+
+/*
+Trans
+key 轉換為可讀性較高的字元
+*/
+func Trans(p []byte) []byte {
+	s := ""
+	for _, b := range p {
+		s = s + decimal.NewFromInt(int64(b)).String()
+	}
+	return []byte(s)
+}
+
 //-------------------------------------------------------------------------------------------------[Bytes]
 
 /*
 Bytes
 */
 type Bytes []byte
-
-/*
-ToString
-另一種做法，將 byte 轉為 int
-*/
-// func (v Bytes) ToString() string {
-// 	d := ""
-// 	for _, b := range v {
-
-// 		d = d + decimal.NewFromInt(int64(b)).String()
-// 	}
-// 	return d
-// }
-
-/*
-ToString
-*/
-func (v Bytes) ToString() string {
-	return string(v)
-}
-
-/*
-ToByte
-*/
-func (v Bytes) ToByte() []byte {
-	return []byte(v)
-}
 
 /*
 Write

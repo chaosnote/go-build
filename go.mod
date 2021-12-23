@@ -11,4 +11,5 @@ require (
 	github.com/gorilla/websocket v1.4.2
 	github.com/onsi/ginkgo v1.15.2 // indirect
 	github.com/onsi/gomega v1.11.0 // indirect
+	github.com/shopspring/decimal v1.3.1
 )
