@@ -19,12 +19,6 @@ const (
 	mMaxMessageSize = 1024                 // 訊息最大長度
 )
 
-const (
-	READ  string = "read"
-	ERROR string = "error"
-	CLOSE string = "close"
-)
-
 //----------------------------------------------------------------------------------------------
 
 /*
