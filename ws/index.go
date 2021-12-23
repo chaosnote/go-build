@@ -54,6 +54,11 @@ Transfer
 		Send:    make(chan []byte),
 		Handler: subscribe{},
 	}
+
+	_transfer.Conn
+	或
+	_transfer.Dial()
+
 */
 type Transfer struct {
 	Param
