@@ -1,11 +1,13 @@
 package ws
 
 import (
-	"log"
+	"fmt"
 	"sync"
 	"time"
 
+	"github.com/chaosnote/go-build/internal"
 	"github.com/chaosnote/go-kernel/net/conn"
+	"go.uber.org/zap"
 
 	"github.com/gorilla/websocket"
 )
@@ -104,7 +106,7 @@ func (v *Group) Send(id string, msg []byte) {
 	if p, ok := v.mPool[id]; ok {
 		p.Send <- msg
 	} else {
-		log.Println("socket lost id >>", id)
+		internal.File("send", zap.Error(fmt.Errorf("socket lost id >> %s", id)))
 	}
 }
 

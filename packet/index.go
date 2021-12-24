@@ -3,9 +3,9 @@ package packet
 import (
 	"fmt"
 
-	"log"
-
+	"github.com/chaosnote/go-build/internal"
 	"github.com/shopspring/decimal"
+	"go.uber.org/zap"
 )
 
 /*
@@ -71,7 +71,7 @@ func Write(action Bytes, content []byte) []byte {
 	}
 
 	if len(b) > MaxMessageSize {
-		log.Fatal(fmt.Sprintf("content length %d > 1024 !\n", len(b)))
+		internal.Fatal("packet", zap.Error(fmt.Errorf("content length %d > 1024 !\n", len(b))))
 	}
 
 	return b
