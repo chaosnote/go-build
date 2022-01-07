@@ -1,7 +1,9 @@
 package sub
 
 import (
+	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/chaosnote/go-build/internal"
@@ -14,7 +16,7 @@ import (
 //-------------------------------------------------------------------------------------------------
 
 const (
-	sleep = 3 * time.Second
+	sleep = 1 * time.Second
 )
 
 var (
@@ -41,6 +43,7 @@ func dial(id string) {
 
 	_transfer, ok := group.Get(id)
 	if !ok {
+		internal.File("sub", zap.String("id", id))
 		return
 	}
 
@@ -72,6 +75,12 @@ func Build(key string, uri url.URL, handler ws.Handler) {
 		},
 		Send:    make(chan []byte),
 		Handler: handler,
+	}
+
+	internal.File("sub", zap.String("path", uri.String()), zap.Int("count", strings.Count(uri.Path, "/")))
+
+	if strings.Count(uri.Path, "/") < 2 {
+		internal.Fatal("sub", zap.Error(fmt.Errorf("error uri.Path => %s", uri.Path)))
 	}
 
 	e := _transfer.Dial()

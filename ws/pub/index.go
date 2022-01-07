@@ -36,7 +36,7 @@ func (v handler) Read(id string, msg []byte) {
 
 func (v handler) Close(id string) {
 	internal.Console("close", zap.String("id", id))
-	dial()
+	dial(false)
 }
 
 func (v handler) Error(id string, e interface{}) {
@@ -45,12 +45,15 @@ func (v handler) Error(id string, e interface{}) {
 
 //-------------------------------------------------------------------------------------------------
 
-func dial() {
+func dial(b bool) {
 
 loop:
 
 	e := transfer.Dial()
 	if e != nil {
+		if b {
+			panic(e)
+		}
 		time.Sleep(sleep)
 		goto loop
 	}
@@ -78,7 +81,7 @@ func Build(uri url.URL) {
 		Handler: handler{},
 	}
 
-	dial()
+	dial(true)
 
 }
 
