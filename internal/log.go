@@ -6,7 +6,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var _logger *helper.Logger
+var _logger *zap.Logger
 
 //-------------------------------------------------------------------------------------------------
 
@@ -14,27 +14,27 @@ var _logger *helper.Logger
 Console
 */
 func Console(msg string, fields ...zap.Field) {
-	_logger.Console.Debug(msg, fields...)
+	helper.Console.Debug(msg, fields...)
 }
 
 /*
 File ...
 */
 func File(msg string, fields ...zap.Field) {
-	_logger.Console.Debug(msg, fields...)
-	_logger.File.Info(msg, fields...)
+	helper.Console.Debug(msg, fields...)
+	_logger.Info(msg, fields...)
 }
 
 /*
 Fatal ...
 */
 func Fatal(msg string, fields ...zap.Field) {
-	_logger.Console.Debug(msg, fields...)
-	_logger.File.Fatal(msg, fields...)
+	helper.Console.Debug(msg, fields...)
+	_logger.Fatal(msg, fields...)
 }
 
 //-------------------------------------------------------------------------------------------------
 
 func init() {
-	_logger = helper.NewLogger("./dist", "build", false)
+	_logger = helper.NewFileLogger("./dist", "kernel")
 }

@@ -31,16 +31,16 @@ type handler struct {
 }
 
 func (v handler) Read(id string, msg []byte) {
-	internal.Console("read", zap.String("id", id), zap.String("msg", string(msg)))
+	internal.Console("pub", zap.String("read", id), zap.String("msg", string(msg)))
 }
 
 func (v handler) Close(id string) {
-	internal.Console("close", zap.String("id", id))
+	internal.Console("pub", zap.String("close", id))
 	dial(false)
 }
 
 func (v handler) Error(id string, e interface{}) {
-	internal.File(id, zap.Any("error", e))
+	internal.File("pub", zap.Any("error", e))
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -51,6 +51,7 @@ loop:
 
 	e := transfer.Dial()
 	if e != nil {
+		internal.File("pub", zap.Error(e))
 		if b {
 			panic(e)
 		}

@@ -29,12 +29,12 @@ type Handler struct {
 }
 
 func (v Handler) Close(id string) {
-	internal.File("close", zap.String("id", id))
+	internal.File("sub", zap.String("close", id))
 	dial(id)
 }
 
 func (v Handler) Error(id string, e interface{}) {
-	internal.File(id, zap.Any("error", e))
+	internal.File("sub", zap.Any("error", e))
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -43,7 +43,7 @@ func dial(id string) {
 
 	_transfer, ok := group.Get(id)
 	if !ok {
-		internal.File("sub", zap.String("id", id))
+		internal.File("sub", zap.String("dial", id))
 		return
 	}
 
@@ -51,12 +51,15 @@ loop:
 
 	e := _transfer.Dial()
 	if e != nil {
+		internal.File("sub", zap.String("dial", id), zap.Error(e))
 		time.Sleep(sleep)
 		goto loop
 	}
 
 	go ws.R(*_transfer)
 	go ws.W(*_transfer)
+
+	internal.File("sub", zap.String("dial", id))
 
 }
 
@@ -77,7 +80,7 @@ func Build(key string, uri url.URL, handler ws.Handler) {
 		Handler: handler,
 	}
 
-	internal.File("sub", zap.String("path", uri.String()), zap.Int("count", strings.Count(uri.Path, "/")))
+	internal.File("sub", zap.String("path", uri.String()))
 
 	if strings.Count(uri.Path, "/") < 2 {
 		internal.Fatal("sub", zap.Error(fmt.Errorf("error uri.Path => %s", uri.Path)))
@@ -85,7 +88,7 @@ func Build(key string, uri url.URL, handler ws.Handler) {
 
 	e := _transfer.Dial()
 	if e != nil {
-		panic(e)
+		internal.Fatal("sub", zap.Error(e))
 	}
 
 	group.Add(_transfer)

@@ -44,7 +44,7 @@ func Build(c Config) {
 
 	if false {
 
-		e = Method.FlushAll().Err()
+		e = Method.FlushAll().Err() // 清空 redis
 		if e != nil {
 			panic(e.Error())
 		}
