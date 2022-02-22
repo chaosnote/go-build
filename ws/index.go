@@ -18,7 +18,7 @@ const (
 	mWriteWait      = 10 * time.Second     // (等待)寫入時間
 	mPongWait       = 60 * time.Second     // (等待)回應時間
 	mPingPeriod     = (mPongWait * 9) / 10 // 偵測時間
-	mMaxMessageSize = 1024                 // 訊息最大長度
+	mMaxMessageSize = 1024 * 5             // 訊息最大長度
 )
 
 //----------------------------------------------------------------------------------------------
@@ -68,7 +68,7 @@ type Transfer struct {
 
 	Conn *websocket.Conn
 
-	Send chan []byte
+	Send chan []byte // 當傳送值為 nil、會觸發關閉連線
 }
 
 func (v *Transfer) Dial() error {
@@ -210,7 +210,6 @@ func R(c Transfer) {
 		}
 
 		c.Conn.Close()
-		c.Send <- nil // close 後呼叫，可讓 W 那邊出現錯誤
 
 		if c.Handler != nil {
 			c.Close(c.ID)
@@ -271,6 +270,10 @@ func W(c Transfer) {
 		select {
 
 		case b, ok := <-c.Send:
+			if len(b) == 0 {
+				c.Conn.Close()
+				return
+			}
 			c.Conn.SetWriteDeadline(time.Now().Add(mWriteWait))
 			if !ok {
 				c.Conn.WriteMessage(websocket.CloseMessage, []byte{})

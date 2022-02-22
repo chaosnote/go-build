@@ -18,7 +18,7 @@ import (
 MaxMessageSize
 */
 const (
-	MaxMessageSize = 1024
+	MaxMessageSize = 1024 * 5
 )
 
 //-------------------------------------------------------------------------------------------------[Packet]
@@ -36,6 +36,13 @@ type Packet struct {
 /*
 Trans
 key 轉換為可讀性較高的字元
+
+	// [0] [0 0 0] [1] [48 48 48]
+	b := []byte{0, 0, 0}
+	fmt.Println("[0]", b, "[1]", packet.Trans(b))
+	// [0]     [1] 000
+	fmt.Println("[0]", string(b), "[1]", string(packet.Trans(b)))
+
 */
 func Trans(p []byte) []byte {
 	s := ""
@@ -71,7 +78,7 @@ func Write(action Bytes, content []byte) []byte {
 	}
 
 	if len(b) > MaxMessageSize {
-		internal.Fatal("packet", zap.Error(fmt.Errorf("content length %d > 1024 !\n", len(b))))
+		internal.Fatal("packet", zap.Error(fmt.Errorf("content length %d > %d", len(b), MaxMessageSize)))
 	}
 
 	return b
