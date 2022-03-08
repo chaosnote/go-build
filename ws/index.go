@@ -5,9 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/chaosnote/go-build/internal"
 	"github.com/chaosnote/go-kernel/net/conn"
-	"go.uber.org/zap"
 
 	"github.com/gorilla/websocket"
 )
@@ -99,14 +97,15 @@ Send
 	msg []byte
 
 */
-func (v *Group) Send(id string, msg []byte) {
+func (v *Group) Send(id string, msg []byte) error {
 	v.mMu.Lock()
 	defer v.mMu.Unlock()
 
 	if p, ok := v.mPool[id]; ok {
 		p.Send <- msg
+		return nil
 	} else {
-		internal.File("send", zap.Error(fmt.Errorf("socket lost id >> %s", id)))
+		return fmt.Errorf("socket lost id ( %s )", id)
 	}
 }
 
