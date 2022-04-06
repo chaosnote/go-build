@@ -36,5 +36,5 @@ func Fatal(msg string, fields ...zap.Field) {
 //-------------------------------------------------------------------------------------------------
 
 func init() {
-	_logger = helper.NewFileLogger("./dist", "kernel")
+	_logger = helper.NewFileLogger("./dist/log", "kernel")
 }
