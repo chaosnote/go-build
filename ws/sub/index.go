@@ -16,7 +16,7 @@ import (
 //-------------------------------------------------------------------------------------------------
 
 const (
-	sleep = 1 * time.Second
+	sleep = internal.Delag * time.Second
 )
 
 var (

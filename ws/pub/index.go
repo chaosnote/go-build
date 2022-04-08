@@ -18,7 +18,7 @@ publish 單一連線
 //-------------------------------------------------------------------------------------------------
 
 const (
-	sleep = 1 * time.Second
+	sleep = internal.Delag * time.Second
 )
 
 var (

@@ -157,7 +157,7 @@ func (v *Group) Remove(id string) {
 	defer v.mMu.Unlock()
 
 	if p, ok := v.mPool[id]; ok {
-		p.Destory()
+		p.Send <- nil
 		delete(v.mPool, id)
 	}
 }
@@ -174,9 +174,12 @@ func (v *Group) Close(id string) {
 	defer v.mMu.Unlock()
 
 	if p, ok := v.mPool[id]; ok {
-		p.Conn.WriteControl(websocket.CloseMessage, []byte("bye"), time.Now().Add(mWriteWait))
-		p.Conn.Close()
 		p.Destory()
+		p.Send <- nil
+		delete(v.mPool, id)
+		// p.Conn.WriteControl(websocket.CloseMessage, []byte("bye"), time.Now().Add(mWriteWait))
+		// p.Conn.Close()
+		//
 	}
 }
 
@@ -187,11 +190,23 @@ func (v *Group) CloseAll() {
 	v.mMu.Lock()
 	defer v.mMu.Unlock()
 
-	for _, p := range v.mPool {
-		p.Conn.WriteControl(websocket.CloseMessage, []byte("bye"), time.Now().Add(mWriteWait))
-		p.Conn.Close()
+	for id, p := range v.mPool {
 		p.Destory()
+		p.Send <- nil
+		delete(v.mPool, id)
+		// p.Conn.WriteControl(websocket.CloseMessage, []byte("bye"), time.Now().Add(mWriteWait))
+		// p.Conn.Close()
 	}
+}
+
+/*
+Count 回傳已註冊數量
+*/
+func (v *Group) Count() int {
+	v.mMu.Lock()
+	defer v.mMu.Unlock()
+
+	return len(v.mPool)
 }
 
 //----------------------------------------------------------------------------------------------
