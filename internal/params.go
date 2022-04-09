@@ -1,5 +1,5 @@
 package internal
 
 const (
-	Delag = 3
+	Delag = 2
 )
