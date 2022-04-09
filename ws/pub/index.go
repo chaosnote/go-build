@@ -2,6 +2,7 @@ package pub
 
 import (
 	"net/url"
+	"sync"
 	"time"
 
 	"github.com/chaosnote/go-build/internal"
@@ -25,6 +26,25 @@ var (
 	transfer *ws.Transfer = nil
 )
 
+var (
+	mu   sync.Mutex
+	flag bool
+)
+
+func set(b bool) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	flag = b
+}
+
+func Connected() bool {
+	mu.Lock()
+	defer mu.Unlock()
+
+	return flag
+}
+
 //-------------------------------------------------------------------------------------------------
 
 type handler struct {
@@ -36,6 +56,7 @@ func (v handler) Read(id string, msg []byte) {
 
 func (v handler) Close(id string) {
 	internal.Console("pub", zap.String("close", id))
+	set(false)
 	dial(false)
 }
 
@@ -62,6 +83,7 @@ loop:
 	go ws.R(*transfer)
 	go ws.W(*transfer)
 
+	set(true)
 }
 
 //-------------------------------------------------------------------------------------------------
