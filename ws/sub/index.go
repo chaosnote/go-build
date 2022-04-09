@@ -68,11 +68,11 @@ loop:
 /*
 Build
 */
-func Build(key string, uri url.URL, handler ws.Handler) {
+func Build(id string, uri url.URL, handler ws.Handler) {
 
 	_transfer := &ws.Transfer{
 		Param: ws.Param{
-			ID:          key,
+			ID:          id,
 			WS:          conn.WebSocket(uri),
 			MessageType: websocket.BinaryMessage,
 		},
