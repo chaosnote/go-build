@@ -29,8 +29,13 @@ var (
 
 var (
 	transfer *ws.Transfer = nil
+)
 
+//-------------------------------------------------------------------------------------------------
+
+var (
 	mu   sync.Mutex
+	pool = [][]byte{}
 	flag bool
 )
 
@@ -46,6 +51,26 @@ func get() bool {
 	defer mu.Unlock()
 
 	return flag
+}
+
+func add2Pool(msg []byte) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	pool = append(pool, msg)
+}
+
+func next() ([]byte, bool) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	if len(pool) > 0 {
+		b := pool[0]
+		pool = pool[1:]
+		return b, true
+	}
+
+	return nil, false
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -93,6 +118,12 @@ loop:
 
 	internal.File("pub", zap.String("tip", "connected"))
 
+	go func() {
+		for b, ok := next(); ok; {
+			transfer.Send <- b
+		}
+	}()
+
 	set(true)
 }
 
@@ -118,13 +149,23 @@ func Build(uri url.URL) {
 }
 
 /*
-Push
+TryPush
 */
-func Push(msg []byte) error {
+func TryPush(msg []byte) error {
 	if !get() {
 		return ErrDisconnect
 	}
 	transfer.Send <- msg
-
 	return nil
+}
+
+/*
+Push
+*/
+func MustPush(msg []byte) {
+	if !get() {
+		add2Pool(msg)
+		return
+	}
+	transfer.Send <- msg
 }
