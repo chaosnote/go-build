@@ -1,6 +1,7 @@
 package pub
 
 import (
+	"fmt"
 	"net/url"
 	"sync"
 	"time"
@@ -23,10 +24,12 @@ const (
 )
 
 var (
-	transfer *ws.Transfer = nil
+	ErrDisconnect = fmt.Errorf("pub disconnect")
 )
 
 var (
+	transfer *ws.Transfer = nil
+
 	mu   sync.Mutex
 	flag bool
 )
@@ -38,7 +41,7 @@ func set(b bool) {
 	flag = b
 }
 
-func Connected() bool {
+func get() bool {
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -67,21 +70,28 @@ func (v handler) Error(id string, e interface{}) {
 //-------------------------------------------------------------------------------------------------
 
 func dial(b bool) {
-
+	var f bool
 loop:
-
 	e := transfer.Dial()
 	if e != nil {
-		internal.File("pub", zap.Error(e))
+
+		if !f {
+			f = true
+			internal.File("pub", zap.Error(e))
+		}
+
 		if b {
 			panic(e)
 		}
+
 		time.Sleep(sleep)
 		goto loop
 	}
 
 	go ws.R(*transfer)
 	go ws.W(*transfer)
+
+	internal.File("pub", zap.String("tip", "connected"))
 
 	set(true)
 }
@@ -90,7 +100,6 @@ loop:
 
 /*
 Build
-
 */
 func Build(uri url.URL) {
 
@@ -111,6 +120,11 @@ func Build(uri url.URL) {
 /*
 Push
 */
-func Push(msg []byte) {
+func Push(msg []byte) error {
+	if !get() {
+		return ErrDisconnect
+	}
 	transfer.Send <- msg
+
+	return nil
 }

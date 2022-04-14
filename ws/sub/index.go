@@ -20,6 +20,10 @@ const (
 )
 
 var (
+	ErrDisconnect = fmt.Errorf("sub disconnect")
+)
+
+var (
 	group = ws.New()
 )
 
@@ -40,24 +44,27 @@ func (v Handler) Error(id string, e interface{}) {
 //-------------------------------------------------------------------------------------------------
 
 func dial(id string) {
-
-	_transfer, ok := group.Get(id)
+	t, ok := group.Get(id)
 	if !ok {
 		internal.File("sub", zap.String("dial", id))
 		return
 	}
 
+	var f bool
 loop:
 
-	e := _transfer.Dial()
+	e := t.Dial()
 	if e != nil {
-		internal.File("sub", zap.String("dial", id), zap.Error(e))
+		if !f {
+			f = true
+			internal.File("sub", zap.String("dial", id), zap.Error(e))
+		}
 		time.Sleep(sleep)
 		goto loop
 	}
 
-	go ws.R(*_transfer)
-	go ws.W(*_transfer)
+	go ws.R(*t)
+	go ws.W(*t)
 
 	internal.File("sub", zap.String("dial", id))
 
@@ -70,7 +77,7 @@ Build
 */
 func Build(id string, uri url.URL, handler ws.Handler) {
 
-	_transfer := &ws.Transfer{
+	transfer := &ws.Transfer{
 		Param: ws.Param{
 			ID:          id,
 			WS:          conn.WebSocket(uri),
@@ -83,17 +90,17 @@ func Build(id string, uri url.URL, handler ws.Handler) {
 	internal.File("sub", zap.String("path", uri.String()))
 
 	if strings.Count(uri.Path, "/") < 2 {
-		internal.Fatal("sub", zap.Error(fmt.Errorf("error uri.Path => %s", uri.Path)))
+		internal.Fatal("sub", zap.Error(fmt.Errorf("error uri.Path ( %s )", uri.Path)))
 	}
 
-	e := _transfer.Dial()
+	e := transfer.Dial()
 	if e != nil {
 		internal.Fatal("sub", zap.Error(e))
 	}
 
-	group.Add(_transfer)
+	group.Add(transfer)
 
-	go ws.R(*_transfer)
-	go ws.W(*_transfer)
+	go ws.R(*transfer)
+	go ws.W(*transfer)
 
 }
